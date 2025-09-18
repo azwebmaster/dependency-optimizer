@@ -1,10 +1,17 @@
 # Changelog
 
+## 0.0.2
+
+### Patch Changes
+
+- 8999866: preview release
+
 All notable changes to this project will be documented in this file.
 
 ## [0.0.1] - 2024-12-18
 
 ### Added
+
 - Initial release of dependency-optimizer package
 - Core dependency scanning with depcheck integration
 - Auto-detection of project specials (ESLint, Babel, Webpack, Jest, Next.js, Gatsby, etc.)
@@ -20,6 +27,7 @@ All notable changes to this project will be documented in this file.
 - Detailed documentation and examples
 
 ### Features
+
 - **Dependency Scanning**: Detect unused dependencies with smart parsing
 - **Monorepo Support**: Recursive scanning across workspace packages
 - **Auto-fix**: Safely remove unused dependencies while preserving formatting
@@ -29,6 +37,7 @@ All notable changes to this project will be documented in this file.
 - **Configuration Detection**: Automatically configure based on project setup
 
 ### CLI Commands
+
 - `dependency-optimizer scan` - Scan for unused dependencies
 - `dependency-optimizer analyze` - Analyze node_modules for optimization
 - `dependency-optimizer examples` - Show usage examples
