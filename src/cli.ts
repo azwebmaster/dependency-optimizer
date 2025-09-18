@@ -25,12 +25,13 @@ program
 program
   .command('scan')
   .description('Scan for unused dependencies')
+  .argument('[path]', 'Path to project directory', process.cwd())
   .option('--fix', 'Automatically remove unused dependencies from package.json')
   .option('--recursive', 'Recursively scan all workspace packages')
   .option('--workspace <pattern>', 'Filter specific workspace packages')
   .option('--verbose', 'Enable verbose output')
   .option('--include-dev', 'Include dev dependencies in scan (default: true)', true)
-  .action(async (options) => {
+  .action(async (projectPath, options) => {
     try {
       console.log('🔍 Scanning for unused dependencies...\n');
 
@@ -43,7 +44,7 @@ program
       };
 
       const scanner = new DependencyScanner(scanOptions);
-      const results = await scanner.scan();
+      const results = await scanner.scan(projectPath);
 
       // Display results
       let totalUnused = 0;
@@ -109,10 +110,11 @@ program
 program
   .command('analyze')
   .description('Analyze node_modules for optimization opportunities')
+  .argument('[path]', 'Path to project directory', process.cwd())
   .option('--size-threshold <mb>', 'Size threshold in MB for flagging large packages', '10')
   .option('--depth-threshold <depth>', 'Depth threshold for flagging deep dependency trees', '5')
   .option('--json', 'Output results in JSON format')
-  .action(async (options) => {
+  .action(async (projectPath, options) => {
     try {
       const analyzeOptions: AnalyzeOptions = {
         sizeThreshold: parseInt(options.sizeThreshold),
@@ -121,7 +123,7 @@ program
       };
 
       const analyzer = new NodeModulesAnalyzer(analyzeOptions);
-      const result = await analyzer.analyze();
+      const result = await analyzer.analyze(projectPath);
 
       if (options.json) {
         console.log(JSON.stringify(result, null, 2));
