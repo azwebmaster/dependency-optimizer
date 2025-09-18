@@ -4,23 +4,19 @@ import { Command } from 'commander';
 import { DependencyScanner } from './scanner.js';
 import { NodeModulesAnalyzer } from './analyzer.js';
 import type { ScanOptions, AnalyzeOptions } from './types.js';
-import * as fs from 'fs';
 import * as path from 'path';
-import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import pkg from "../package.json" with { type: "json" };
 
-// Read package.json for version info
-const packageJsonPath = path.join(__dirname, '..', 'package.json');
-const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+// Read version from package.json dynamically
+const VERSION: string = pkg.version;
 
 const program = new Command();
 
 program
   .name('dependency-optimizer')
   .description('Scan for unused dependencies and node_modules waste')
-  .version(packageJson.version);
+  .version(VERSION);
 
 program
   .command('scan')
