@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.3
+
+### Patch Changes
+
+- f8d037b: publish bins
+- 6484d97: publish bins
+
 ## 0.0.2
 
 ### Patch Changes
