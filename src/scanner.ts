@@ -9,6 +9,7 @@ import type {
   PackageJson,
   WorkspaceConfig
 } from './types.js';
+import vitest from './special/vitest.js';
 
 export class DependencyScanner {
   constructor(private options: ScanOptions = {}) {}
@@ -118,18 +119,21 @@ export class DependencyScanner {
         const packageContent = await fs.readFile(packageJsonPath, 'utf-8');
         const packageJson: PackageJson = JSON.parse(packageContent);
         result.packageName = packageJson.name;
+      } else {
+        throw new Error(`No package.json found in ${packagePath}`);
       }
 
       // Configure depcheck options with auto-detected specials
       const depcheckOptions = await this.buildDepcheckOptions(packagePath);
-      
+
       if (this.options.verbose) {
-        console.log(`🔍 Scanning ${result.packageName || packagePath}`);
+        console.log(`🔍 Scanning ${packagePath}`);
         console.log(`   Using specials: ${depcheckOptions.specials?.map((s: any) => s.name || 'custom').join(', ') || 'none'}`);
       }
 
-      // Run depcheck
-      const depcheckResult = await depcheck(packagePath, depcheckOptions);
+      // Run depcheck - use absolute path to ensure proper resolution
+      const absolutePackagePath = path.resolve(packagePath);
+      const depcheckResult = await depcheck(absolutePackagePath, depcheckOptions);
 
       // Convert depcheck results to our format
       const unusedDeps: UnusedDependency[] = [];
@@ -165,13 +169,24 @@ export class DependencyScanner {
     const options: any = {
       // Use default parsers for optimal detection
       parsers: {
-        '*.js': depcheck.parser.es6,
-        '*.jsx': depcheck.parser.jsx,
-        '*.ts': depcheck.parser.typescript,
-        '*.tsx': depcheck.parser.typescript,
-        '*.vue': depcheck.parser.vue
+        '**/*.js': depcheck.parser.es6,
+        '**/*.jsx': depcheck.parser.jsx,
+        '**/*.ts': depcheck.parser.typescript,
+        '**/*.tsx': depcheck.parser.typescript,
+        '**/*.vue': depcheck.parser.vue
       },
-      specials: []
+      specials: [],
+      // Skip certain files that might cause resolution issues
+      ignoreBinPackage: false,
+      skipMissing: false,
+      ignoreMatches: [],
+      ignorePatterns: [
+        'sandbox',
+        'dist',
+        'bower_components',
+        '.git',
+        'node_modules',
+      ]
     };
 
     // Auto-detect and enable appropriate specials
@@ -202,6 +217,16 @@ export class DependencyScanner {
     if (await this.fileExists(path.join(packagePath, 'jest.config.js')) ||
         await this.fileExists(path.join(packagePath, 'jest.config.ts'))) {
       specials.push(depcheck.special.jest);
+    }
+
+    // Vitest
+    if (await this.fileExists(path.join(packagePath, 'vitest.config.js')) ||
+        await this.fileExists(path.join(packagePath, 'vitest.config.ts')) ||
+        await this.fileExists(path.join(packagePath, 'vitest.config.mjs')) ||
+        await this.fileExists(path.join(packagePath, 'vite.config.js')) ||
+        await this.fileExists(path.join(packagePath, 'vite.config.ts')) ||
+        await this.fileExists(path.join(packagePath, 'vite.config.mjs'))) {
+      specials.push(vitest);
     }
 
     // Next.js
