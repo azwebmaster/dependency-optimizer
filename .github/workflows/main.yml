@@ -100,7 +100,7 @@ jobs:
             for (const exe of executables) {
               if (fs.existsSync(exe.path)) {
                 const file = fs.readFileSync(exe.path);
-                await octokit.repos.uploadReleaseAsset({
+                await octokit.rest.repos.uploadReleaseAsset({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   release_id: release.data.id,
