@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.0.4
+
+### Patch Changes
+
+- 3e43007: fix bin uploads to release
+
 ## 0.0.3
 
 ### Patch Changes
