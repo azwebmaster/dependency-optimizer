@@ -5,6 +5,9 @@ import { DependencyScanner } from './scanner.js';
 import { NodeModulesAnalyzer } from './analyzer.js';
 import type { ScanOptions, AnalyzeOptions } from './types.js';
 import * as path from 'path';
+import createDebug from 'debug';
+
+const debug = createDebug('depoptimize:cli');
 
 import pkg from "../package.json" with { type: "json" };
 
@@ -29,6 +32,8 @@ program
   .option('--include-dev', 'Include dev dependencies in scan (default: true)', true)
   .action(async (projectPath, options) => {
     try {
+      debug('Starting scan command with options: %O', options);
+      debug('Project path: %s', projectPath);
       console.log('🔍 Scanning for unused dependencies...\n');
 
       const scanOptions: ScanOptions = {
@@ -40,14 +45,18 @@ program
       };
 
       const scanner = new DependencyScanner(scanOptions);
+      debug('Created scanner with options: %O', scanOptions);
       const results = await scanner.scan(projectPath);
+      debug('Scan completed, found %d results', results.length);
 
       // Display results
       let totalUnused = 0;
       let totalFixed = 0;
 
       for (const result of results) {
+        debug('Processing result for package: %s', result.packageName || result.packagePath);
         if (result.errors && result.errors.length > 0) {
+          debug('Errors found: %O', result.errors);
           console.log(`❌ Error scanning ${result.packageName || result.packagePath}:`);
           result.errors.forEach(error => console.log(`   ${error}`));
           console.log('');
@@ -55,6 +64,7 @@ program
         }
 
         if (result.unusedDependencies.length === 0) {
+          debug('No unused dependencies found for %s', result.packageName);
           if (options.verbose || results.length === 1) {
             console.log(`✅ ${result.packageName || path.basename(result.packagePath)}: No unused dependencies`);
           }
@@ -62,6 +72,7 @@ program
         }
 
         totalUnused += result.unusedDependencies.length;
+        debug('Found %d unused dependencies', result.unusedDependencies.length);
 
         if (results.length > 1) {
           console.log(`📦 ${result.packageName || path.basename(result.packagePath)}:`);
@@ -69,6 +80,7 @@ program
 
         if (options.fix && result.fixedDependencies) {
           totalFixed += result.fixedDependencies.length;
+          debug('Fixed %d dependencies', result.fixedDependencies.length);
           console.log('🔧 Fixed package.json:');
           result.fixedDependencies.forEach(dep => {
             console.log(`  ✅ Removed ${dep.name} from ${dep.type}`);
@@ -83,6 +95,7 @@ program
       }
 
       // Summary
+      debug('Scan summary - packages: %d, unused: %d, fixed: %d', results.length, totalUnused, totalFixed);
       if (results.length > 1) {
         console.log('📊 Summary:');
         console.log(`   Packages scanned: ${results.length}`);
@@ -97,6 +110,7 @@ program
       }
 
     } catch (error: any) {
+      debug('Scan command failed with error: %O', error);
       console.error('\n❌ Scan failed:');
       console.error(`   ${error.message}`);
       process.exit(1);
@@ -112,6 +126,8 @@ program
   .option('--json', 'Output results in JSON format')
   .action(async (projectPath, options) => {
     try {
+      debug('Starting analyze command with options: %O', options);
+      debug('Project path: %s', projectPath);
       const analyzeOptions: AnalyzeOptions = {
         sizeThreshold: parseInt(options.sizeThreshold),
         depthThreshold: parseInt(options.depthThreshold),
@@ -119,7 +135,9 @@ program
       };
 
       const analyzer = new NodeModulesAnalyzer(analyzeOptions);
+      debug('Created analyzer with options: %O', analyzeOptions);
       const result = await analyzer.analyze(projectPath);
+      debug('Analysis completed: %O', { totalPackages: result.totalPackages, totalSize: result.totalSize });
 
       if (options.json) {
         console.log(JSON.stringify(result, null, 2));
@@ -130,6 +148,7 @@ program
       console.log('========================\n');
 
       if (result.totalPackages === 0) {
+        debug('No node_modules found at path: %s', projectPath);
         console.log('❌ No node_modules found');
         return;
       }
@@ -139,6 +158,7 @@ program
       console.log(`📁 Location: ${result.nodeModulesPath}\n`);
 
       // Large packages
+      debug('Found %d large packages', result.largePackages.length);
       if (result.largePackages.length > 0) {
         console.log(`🔴 Large packages (>${analyzeOptions.sizeThreshold}MB):`);
         result.largePackages.forEach(pkg => {
@@ -150,6 +170,7 @@ program
       }
 
       // Deep packages
+      debug('Found %d deep packages', result.deepPackages.length);
       if (result.deepPackages.length > 0) {
         console.log(`🔶 Deep dependency packages (>${analyzeOptions.depthThreshold} levels):`);
         result.deepPackages.forEach(pkg => {
@@ -162,6 +183,7 @@ program
 
       // Optimization suggestions
       const totalLargeSize = result.largePackages.reduce((sum, pkg) => sum + pkg.size, 0);
+      debug('Total size of large packages: %d bytes', totalLargeSize);
       if (totalLargeSize > 0) {
         console.log('💡 Optimization suggestions:');
         console.log(`   • Large packages account for ${analyzer.formatSize(totalLargeSize)} (${((totalLargeSize / result.totalSize) * 100).toFixed(1)}%)`);
@@ -173,6 +195,7 @@ program
       }
 
     } catch (error: any) {
+      debug('Analyze command failed with error: %O', error);
       console.error('\n❌ Analysis failed:');
       console.error(`   ${error.message}`);
       process.exit(1);
@@ -218,4 +241,6 @@ program
   });
 
 // Parse command line arguments
+debug('Parsing command line arguments');
 program.parse();
+debug('Command line parsing complete');
