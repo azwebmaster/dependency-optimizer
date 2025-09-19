@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.0.7
+
+### Patch Changes
+
+- 67f0bcb: compress release assets
+
 ## 0.0.6
 
 ### Patch Changes
