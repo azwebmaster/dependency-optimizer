@@ -1,6 +1,6 @@
 {
   "name": "@azwebmaster/dependency-optimizer",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "description": "Scan for unused dependencies and node_modules waste",
   "publishConfig": {
     "registry": "https://registry.npmjs.org"

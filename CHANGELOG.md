@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.0.10
+
+### Patch Changes
+
+- 8b7fc2c: support symlinks
+
 ## 0.0.9
 
 ### Patch Changes
