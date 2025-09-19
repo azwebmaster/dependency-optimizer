@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.0.5
+
+### Patch Changes
+
+- e59eb80: fix executable releases
+
 ## 0.0.4
 
 ### Patch Changes
