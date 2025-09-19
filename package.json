@@ -9,7 +9,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "dependency-optimizer": "dist/cli.js"
+    "depoptimize": "dist/cli.js"
   },
   "files": [
     "dist"
@@ -22,16 +22,14 @@
   },
   "packageManager": "bun@1.2.19",
   "scripts": {
-    "build": "bun run tsc",
-    "test": "bun test",
-    "test:watch": "bun test --watch",
-    "test:coverage": "bun test --coverage",
+    "build": "bun tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
-    "cli": "bun run src/cli.ts",
-    "dev": "bun run src/cli.ts",
     "changeset": "changeset",
     "version": "changeset version",
-    "release": "bun run build && changeset publish"
+    "release": "changeset publish"
   },
   "dependencies": {
     "commander": "^12.1.0",
