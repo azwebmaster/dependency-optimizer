@@ -84,7 +84,7 @@ jobs:
           script: |
             const fs = require('fs');
             const tag = `v${process.env.VERSION}`;
-            const release = await octokit.repos.getReleaseByTag({
+            const release = await octokit.rest.repos.getReleaseByTag({
               owner: context.repo.owner,
               repo: context.repo.repo,
               tag: tag
