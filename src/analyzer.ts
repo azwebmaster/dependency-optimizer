@@ -80,8 +80,23 @@ export class NodeModulesAnalyzer {
       const entries = await fs.readdir(nodeModulesPath, { withFileTypes: true });
 
       for (const entry of entries) {
-        if (entry.isDirectory()) {
+        if (entry.isDirectory() || entry.isSymbolicLink()) {
           const entryPath = path.join(nodeModulesPath, entry.name);
+
+          // For symlinks, check if they point to directories
+          if (entry.isSymbolicLink()) {
+            try {
+              const stats = await fs.stat(entryPath);
+              if (!stats.isDirectory()) {
+                debug('Symlink %s does not point to a directory, skipping', entry.name);
+                continue;
+              }
+              debug('Found symlinked directory: %s', entry.name);
+            } catch (error) {
+              debug('Failed to resolve symlink %s: %O', entry.name, error);
+              continue;
+            }
+          }
 
           if (entry.name.startsWith('@')) {
             // Scoped packages
@@ -89,10 +104,26 @@ export class NodeModulesAnalyzer {
             try {
               const scopedEntries = await fs.readdir(entryPath, { withFileTypes: true });
               for (const scopedEntry of scopedEntries) {
-                if (scopedEntry.isDirectory()) {
+                if (scopedEntry.isDirectory() || scopedEntry.isSymbolicLink()) {
                   const scopedPath = path.join(entryPath, scopedEntry.name);
+
+                  // For symlinks in scoped packages, check if they point to directories
+                  if (scopedEntry.isSymbolicLink()) {
+                    try {
+                      const stats = await fs.stat(scopedPath);
+                      if (!stats.isDirectory()) {
+                        debug('Symlink %s/%s does not point to a directory, skipping', entry.name, scopedEntry.name);
+                        continue;
+                      }
+                      debug('Found symlinked scoped package: %s/%s', entry.name, scopedEntry.name);
+                    } catch (error) {
+                      debug('Failed to resolve symlink %s/%s: %O', entry.name, scopedEntry.name, error);
+                      continue;
+                    }
+                  }
+
                   const packageName = `${entry.name}/${scopedEntry.name}`;
-                  
+
                   // Verify it's a valid package
                   if (await this.isValidPackage(scopedPath)) {
                     debug('Found scoped package: %s', packageName);
@@ -175,6 +206,25 @@ export class NodeModulesAnalyzer {
             continue;
           }
           size += await this.getDirectorySize(entryPath);
+        } else if (entry.isSymbolicLink()) {
+          try {
+            const stats = await fs.stat(entryPath);
+            if (stats.isDirectory()) {
+              // Skip nested node_modules to avoid double counting
+              if (entry.name === 'node_modules') {
+                debug('Skipping symlinked nested node_modules in: %s', dirPath);
+                continue;
+              }
+              debug('Following symlinked directory: %s', entryPath);
+              size += await this.getDirectorySize(entryPath);
+            } else if (stats.isFile()) {
+              debug('Following symlinked file: %s', entryPath);
+              size += stats.size;
+            }
+          } catch (error) {
+            // Skip symlinks we can't resolve
+            debug('Failed to resolve symlink %s: %O', entryPath, error);
+          }
         } else if (entry.isFile()) {
           try {
             const stats = await fs.stat(entryPath);
