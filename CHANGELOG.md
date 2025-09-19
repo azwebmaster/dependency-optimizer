@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.0.9
+
+### Patch Changes
+
+- d5d41ca: add debug
+
 ## 0.0.8
 
 ### Patch Changes
