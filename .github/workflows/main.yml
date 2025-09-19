@@ -71,6 +71,9 @@ jobs:
       - name: Upload executables to release
         if: steps.changesets.outputs.published == 'true'
         uses: actions/github-script@v7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ env.VERSION }}
         with:
           script: |
             const fs = require('fs');
