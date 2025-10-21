@@ -136,8 +136,10 @@ describe('NodeModulesAnalyzer', () => {
       mockOptions.includeDevDependencies = false;
       analyzer = new NodeModulesAnalyzer(mockOptions);
 
+      const projectDir = path.dirname(tempProjectPath);
+      
       // This should return false because prettier is only reachable through dev dependencies
-      const result = await analyzer['shouldIncludePackage']('/test/node_modules/prettier', 'prettier');
+      const result = await analyzer['shouldIncludePackage'](path.join(projectDir, 'node_modules', 'prettier'), 'prettier');
       expect(result).toBe(false);
     });
 
@@ -146,8 +148,9 @@ describe('NodeModulesAnalyzer', () => {
       mockOptions.includeDevDependencies = false;
       analyzer = new NodeModulesAnalyzer(mockOptions);
 
+      const projectDir = path.dirname(tempProjectPath);
       // This should return true because commander is a production dependency
-      const result = await analyzer['shouldIncludePackage']('/test/node_modules/commander', 'commander');
+      const result = await analyzer['shouldIncludePackage'](path.join(projectDir, 'node_modules', 'commander'), 'commander');
       expect(result).toBe(true);
     });
   });

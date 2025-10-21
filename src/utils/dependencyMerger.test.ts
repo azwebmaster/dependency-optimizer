@@ -167,6 +167,10 @@ describe('DependencyMerger', () => {
       JSON.stringify(rootPackageJson, null, 2)
     );
 
+    // Create workspace root node_modules directory
+    const rootNodeModules = path.join(tempDir, 'node_modules');
+    await fs.mkdir(rootNodeModules, { recursive: true });
+
     // Create workspace package
     const packageDir = path.join(tempDir, 'packages', 'package-a');
     await fs.mkdir(packageDir, { recursive: true });

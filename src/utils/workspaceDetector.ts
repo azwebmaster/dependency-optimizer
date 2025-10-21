@@ -135,6 +135,22 @@ export class WorkspaceDetector {
       return 'npm'; // Treat bun workspaces as npm-style
     }
 
+    // If we found a workspace configuration but no lock file, default to npm
+    // This handles test cases where we create workspaces without lock files
+    const packageJsonPath = path.join(workspaceRoot, 'package.json');
+    if (await this.fileExists(packageJsonPath)) {
+      try {
+        const packageContent = await fs.promises.readFile(packageJsonPath, 'utf-8');
+        const packageJson: PackageJson = JSON.parse(packageContent);
+        
+        if (packageJson.workspaces) {
+          return 'npm'; // Default to npm for workspaces without lock files
+        }
+      } catch (error) {
+        debug('Error reading package.json for workspace type detection: %O', error);
+      }
+    }
+
     return null;
   }
 

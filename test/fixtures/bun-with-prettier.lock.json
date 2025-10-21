@@ -1,0 +1,32 @@
+{
+  "lockfileVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "test-project-with-prettier",
+      "dependencies": {
+        "commander": "^12.1.0",
+        "debug": "^4.4.3"
+      },
+      "devDependencies": {
+        "@changesets/cli": "^2.29.7",
+        "typescript": "^5.0.0"
+      }
+    }
+  },
+  "packages": {
+    "@changesets/cli": ["@changesets/cli@2.29.7", "https://registry.npmjs.org/@changesets/cli/-/cli-2.29.7.tgz", {
+      "dependencies": {
+        "@changesets/apply-release-plan": "^1.0.0"
+      }
+    }, "sha512-hash1"],
+    "@changesets/apply-release-plan": ["@changesets/apply-release-plan@1.0.0", "https://registry.npmjs.org/@changesets/apply-release-plan/-/apply-release-plan-1.0.0.tgz", {
+      "dependencies": {
+        "prettier": "^3.0.0"
+      }
+    }, "sha512-hash2"],
+    "commander": ["commander@12.1.0", "https://registry.npmjs.org/commander/-/commander-12.1.0.tgz", {}, "sha512-hash3"],
+    "debug": ["debug@4.4.3", "https://registry.npmjs.org/debug/-/debug-4.4.3.tgz", {}, "sha512-hash4"],
+    "prettier": ["prettier@3.0.0", "https://registry.npmjs.org/prettier/-/prettier-3.0.0.tgz", {}, "sha512-hash5"],
+    "typescript": ["typescript@5.0.0", "https://registry.npmjs.org/typescript/-/typescript-5.0.0.tgz", {}, "sha512-hash6"]
+  }
+}

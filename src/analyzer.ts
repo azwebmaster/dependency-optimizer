@@ -236,6 +236,8 @@ export class NodeModulesAnalyzer {
           debug('Excluding dev-only transitive dependency: %s', depName);
           return false;
         }
+      } else {
+        debug('No lock data available for %s, falling back to default behavior', depName);
       }
     } catch (error) {
       debug('Could not check dev dependency status for %s: %O', depName, error);
@@ -478,19 +480,24 @@ export class NodeModulesAnalyzer {
     // The lockData structure depends on the lock file type
     let packageData: any = null;
     
-    if (lockData.packages) {
-      // Original Bun lock file structure: packages[packageName] = [version, url, {dependencies}, hash]
-      const packageEntry = lockData.packages[currentPackage];
-      if (packageEntry && Array.isArray(packageEntry) && packageEntry.length >= 3) {
-        packageData = packageEntry[2];
-        debug('Found package data for %s in lockData.packages: %O', currentPackage, packageData);
-      } else {
-        debug('No package data found for %s in lockData.packages', currentPackage);
-      }
-    } else if (lockData.dependencies) {
+    if (lockData.dependencies) {
       // Converted LockFileData structure: dependencies[packageName] = {dependencies: {...}}
       packageData = lockData.dependencies[currentPackage];
       debug('Found package data for %s in lockData.dependencies: %O', currentPackage, packageData);
+    } else if (lockData.packages) {
+      // Bun lock file structure: packages[packageName] = [version, url, {dependencies}, hash] or {name, version, dependencies, ...}
+      const packageEntry = lockData.packages[currentPackage];
+      if (packageEntry && Array.isArray(packageEntry) && packageEntry.length >= 3) {
+        // Old Bun format: [version, url, {dependencies}, hash]
+        packageData = packageEntry[2];
+        debug('Found package data for %s in lockData.packages (old format): %O', currentPackage, packageData);
+      } else if (packageEntry && typeof packageEntry === 'object' && packageEntry.dependencies) {
+        // New Bun format: {name, version, dependencies, ...}
+        packageData = packageEntry;
+        debug('Found package data for %s in lockData.packages (new format): %O', currentPackage, packageData);
+      } else {
+        debug('No package data found for %s in lockData.packages', currentPackage);
+      }
     }
     
     if (!packageData || !packageData.dependencies) {
