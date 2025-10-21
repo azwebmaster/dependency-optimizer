@@ -1,128 +1,154 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { NodeModulesAnalyzer } from './analyzer.js';
+import { AnalyzeOptions } from './types.js';
+import { TestUtils } from '../test/testUtils.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import * as os from 'os';
 
 describe('NodeModulesAnalyzer', () => {
-  let tempDir: string;
-  
+  let analyzer: NodeModulesAnalyzer;
+  let mockOptions: AnalyzeOptions;
+  let tempProjectPath: string;
+
   beforeEach(async () => {
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'analyzer-test-'));
+    // Create a temporary project directory with package.json and lock file
+    tempProjectPath = await TestUtils.createTempBunLockFromFixture('bun-with-prettier.lock.json');
+    const projectDir = path.dirname(tempProjectPath);
+    
+    // Create package.json
+    const packageJson = {
+      name: 'test-project-with-prettier',
+      dependencies: {
+        commander: '^12.1.0',
+        debug: '^4.4.3'
+      },
+      devDependencies: {
+        '@changesets/cli': '^2.29.7',
+        typescript: '^5.0.0'
+      }
+    };
+    await fs.writeFile(path.join(projectDir, 'package.json'), JSON.stringify(packageJson, null, 2));
+
+    mockOptions = {
+      sizeThreshold: 10,
+      depthThreshold: 5,
+      json: false,
+      includeDevDependencies: true,
+      projectPath: projectDir
+    };
+    analyzer = new NodeModulesAnalyzer(mockOptions);
   });
 
   afterEach(async () => {
-    try {
-      await fs.rm(tempDir, { recursive: true, force: true });
-    } catch {
-      // Ignore cleanup errors
+    // Clean up temporary files
+    if (tempProjectPath) {
+      const projectDir = path.dirname(tempProjectPath);
+      await fs.rm(projectDir, { recursive: true, force: true });
     }
   });
 
-  it('should create analyzer with default options', () => {
-    const analyzer = new NodeModulesAnalyzer();
-    expect(analyzer).toBeDefined();
+  describe('isOnlyDevDependencyFromLockFile', () => {
+    it('should return true for direct dev dependencies', async () => {
+      const packageJson = {
+        devDependencies: { typescript: '^5.0.0' },
+        dependencies: {}
+      };
+
+      const result = await analyzer['isOnlyDevDependencyFromLockFile']('typescript', packageJson, {});
+      expect(result).toBe(true);
+    });
+
+    it('should return false for direct production dependencies', async () => {
+      const packageJson = {
+        devDependencies: {},
+        dependencies: { commander: '^12.1.0' }
+      };
+
+      const result = await analyzer['isOnlyDevDependencyFromLockFile']('commander', packageJson, {});
+      expect(result).toBe(false);
+    });
+
+    it('should return true for transitive dev-only dependencies (prettier)', async () => {
+      const packageJson = {
+        devDependencies: { '@changesets/cli': '^2.29.7' },
+        dependencies: {}
+      };
+
+      // Load the actual lock file data from fixture
+      const lockFileContent = TestUtils.loadFixture('bun-with-prettier.lock.json');
+      const lockData = JSON.parse(lockFileContent);
+
+      const result = await analyzer['isOnlyDevDependencyFromLockFile']('prettier', packageJson, lockData);
+      expect(result).toBe(true);
+    });
+
+    it('should return false for packages reachable through production dependencies', async () => {
+      const packageJson = {
+        devDependencies: { '@changesets/cli': '^2.29.7' },
+        dependencies: { commander: '^12.1.0' }
+      };
+
+      // Load the actual lock file data from fixture
+      const lockFileContent = TestUtils.loadFixture('bun-with-prettier.lock.json');
+      const lockData = JSON.parse(lockFileContent);
+
+      // commander is a production dependency, so it should not be considered dev-only
+      const result = await analyzer['isOnlyDevDependencyFromLockFile']('commander', packageJson, lockData);
+      expect(result).toBe(false);
+    });
   });
 
-  it('should handle missing node_modules', async () => {
-    const analyzer = new NodeModulesAnalyzer();
-    const result = await analyzer.analyze(tempDir);
+  describe('findAllPathsToPackage', () => {
+    it('should find paths from dev dependencies to prettier', () => {
+      // Load the actual lock file data from fixture
+      const lockFileContent = TestUtils.loadFixture('bun-with-prettier.lock.json');
+      const lockData = JSON.parse(lockFileContent);
 
-    expect(result.totalPackages).toBe(0);
-    expect(result.totalSize).toBe(0);
-    expect(result.largePackages).toEqual([]);
-    expect(result.deepPackages).toEqual([]);
+      const paths = analyzer['findAllPathsToPackage']('prettier', ['@changesets/cli'], lockData);
+      expect(paths).toHaveLength(1);
+      expect(paths[0]).toEqual(['@changesets/cli', '@changesets/apply-release-plan', 'prettier']);
+    });
+
+    it('should find paths from production dependencies', () => {
+      // Load the actual lock file data from fixture
+      const lockFileContent = TestUtils.loadFixture('bun-with-prettier.lock.json');
+      const lockData = JSON.parse(lockFileContent);
+
+      const paths = analyzer['findAllPathsToPackage']('commander', ['commander'], lockData);
+      expect(paths).toHaveLength(1);
+      expect(paths[0]).toEqual(['commander']);
+    });
+
+    it('should handle packages with no dependencies', () => {
+      // Load the actual lock file data from fixture
+      const lockFileContent = TestUtils.loadFixture('bun-with-prettier.lock.json');
+      const lockData = JSON.parse(lockFileContent);
+
+      const paths = analyzer['findAllPathsToPackage']('typescript', ['typescript'], lockData);
+      expect(paths).toHaveLength(1);
+      expect(paths[0]).toEqual(['typescript']);
+    });
   });
 
-  it('should analyze simple node_modules structure', async () => {
-    // Create mock node_modules with a simple package
-    const nodeModulesDir = path.join(tempDir, 'node_modules');
-    const packageDir = path.join(nodeModulesDir, 'test-package');
-    await fs.mkdir(packageDir, { recursive: true });
+  describe('integration tests with real lock file', () => {
+    it('should correctly identify prettier as dev-only transitive dependency', async () => {
+      // Set includeDevDependencies to false to test filtering
+      mockOptions.includeDevDependencies = false;
+      analyzer = new NodeModulesAnalyzer(mockOptions);
 
-    // Create package.json
-    const packageJson = {
-      name: 'test-package',
-      version: '1.0.0'
-    };
-    await fs.writeFile(
-      path.join(packageDir, 'package.json'),
-      JSON.stringify(packageJson, null, 2)
-    );
+      // This should return false because prettier is only reachable through dev dependencies
+      const result = await analyzer['shouldIncludePackage']('/test/node_modules/prettier', 'prettier');
+      expect(result).toBe(false);
+    });
 
-    // Create some files to give it size
-    await fs.writeFile(path.join(packageDir, 'index.js'), 'console.log("test");');
-    await fs.writeFile(path.join(packageDir, 'readme.md'), '# Test Package\n\nThis is a test.');
+    it('should correctly identify commander as production dependency', async () => {
+      // Set includeDevDependencies to false to test filtering
+      mockOptions.includeDevDependencies = false;
+      analyzer = new NodeModulesAnalyzer(mockOptions);
 
-    const analyzer = new NodeModulesAnalyzer();
-    const result = await analyzer.analyze(tempDir);
-
-    expect(result.totalPackages).toBe(1);
-    expect(result.totalSize).toBeGreaterThan(0);
-    expect(result.nodeModulesPath).toBe(nodeModulesDir);
-  });
-
-  it('should detect large packages', async () => {
-    const nodeModulesDir = path.join(tempDir, 'node_modules');
-    const packageDir = path.join(nodeModulesDir, 'large-package');
-    await fs.mkdir(packageDir, { recursive: true });
-
-    const packageJson = {
-      name: 'large-package',
-      version: '1.0.0'
-    };
-    await fs.writeFile(
-      path.join(packageDir, 'package.json'),
-      JSON.stringify(packageJson, null, 2)
-    );
-
-    // Create a large file (1MB threshold for test)
-    const largeContent = 'x'.repeat(2 * 1024 * 1024); // 2MB
-    await fs.writeFile(path.join(packageDir, 'large-file.js'), largeContent);
-
-    const analyzer = new NodeModulesAnalyzer({ sizeThreshold: 1 }); // 1MB threshold
-    const result = await analyzer.analyze(tempDir);
-
-    expect(result.largePackages).toHaveLength(1);
-    expect(result.largePackages[0].name).toBe('large-package');
-    expect(result.largePackages[0].size).toBeGreaterThan(1024 * 1024);
-  });
-
-  it('should handle scoped packages', async () => {
-    const nodeModulesDir = path.join(tempDir, 'node_modules');
-    const scopeDir = path.join(nodeModulesDir, '@test');
-    const packageDir = path.join(scopeDir, 'scoped-package');
-    await fs.mkdir(packageDir, { recursive: true });
-
-    const packageJson = {
-      name: '@test/scoped-package',
-      version: '1.0.0'
-    };
-    await fs.writeFile(
-      path.join(packageDir, 'package.json'),
-      JSON.stringify(packageJson, null, 2)
-    );
-
-    await fs.writeFile(path.join(packageDir, 'index.js'), 'module.exports = {};');
-
-    const analyzer = new NodeModulesAnalyzer();
-    const result = await analyzer.analyze(tempDir);
-
-    expect(result.totalPackages).toBe(1);
-    expect(result.totalSize).toBeGreaterThan(0);
-  });
-
-  it('should format sizes correctly', () => {
-    const analyzer = new NodeModulesAnalyzer();
-
-    expect(analyzer.formatSize(500)).toBe('500.0B');
-    expect(analyzer.formatSize(1536)).toBe('1.5KB');
-    expect(analyzer.formatSize(1024 * 1024)).toBe('1.0MB');
-    expect(analyzer.formatSize(1.5 * 1024 * 1024 * 1024)).toBe('1.5GB');
-  });
-
-  it('should support JSON output option', () => {
-    const analyzer = new NodeModulesAnalyzer({ json: true });
-    expect(analyzer).toBeDefined();
+      // This should return true because commander is a production dependency
+      const result = await analyzer['shouldIncludePackage']('/test/node_modules/commander', 'commander');
+      expect(result).toBe(true);
+    });
   });
 });

@@ -1,0 +1,65 @@
+---
+globs: *.test.ts
+description: Testing patterns and conventions
+---
+
+# Testing Patterns
+
+## Test File Structure
+
+```typescript
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { ClassUnderTest } from './classUnderTest.js';
+
+describe('ClassUnderTest', () => {
+  let instance: ClassUnderTest;
+
+  beforeEach(() => {
+    instance = new ClassUnderTest();
+  });
+
+  it('should create instance', () => {
+    expect(instance).toBeDefined();
+  });
+
+  it('should have required methods', () => {
+    expect(typeof instance.methodName).toBe('function');
+  });
+});
+```
+
+## Test Organization
+
+- **Group related tests** in `describe` blocks
+- **Use descriptive test names** that explain the expected behavior
+- **Set up test data** in `beforeEach` hooks
+- **Clean up resources** in `afterEach` hooks when needed
+
+## Mocking and Fixtures
+
+- **Use test fixtures** from [test/fixtures/](mdc:test/fixtures/) for lock file data
+- **Create temporary files** for testing file operations
+- **Mock external dependencies** when testing isolated functionality
+
+## Assertion Patterns
+
+- **Test both success and error cases**
+- **Verify return types and structures**
+- **Check method existence** for public APIs
+- **Validate data transformations** in parsers
+
+## Parser Testing
+
+For lock file parsers, test:
+- **Instance creation** and basic functionality
+- **File parsing** with valid and invalid data
+- **Dependency tree building** with expected structure
+- **Error handling** for malformed files
+- **Edge cases** like empty files or missing dependencies
+
+## Coverage Goals
+
+- **Aim for 80%+ coverage** as configured in [vitest.config.ts](mdc:vitest.config.ts)
+- **Focus on critical paths** and error handling
+- **Test public APIs thoroughly**
+- **Include integration tests** for complex workflows

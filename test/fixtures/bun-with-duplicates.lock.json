@@ -1,0 +1,71 @@
+{
+  "lockfileVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "test-project-with-duplicates",
+      "dependencies": {
+        "packageA": "^1.0.0",
+        "packageB": "^2.0.0"
+      },
+      "devDependencies": {
+        "dev-package": "^1.0.0"
+      }
+    }
+  },
+  "packages": {
+    "packageA": [
+      "packageA@1.0.0",
+      "https://registry.npmjs.org/packageA/-/packageA-1.0.0.tgz",
+      {
+        "dependencies": {
+          "shared-dep": "^1.0.0"
+        }
+      },
+      "sha512-abcd1234"
+    ],
+    "packageB": [
+      "packageB@2.0.0",
+      "https://registry.npmjs.org/packageB/-/packageB-2.0.0.tgz",
+      {
+        "dependencies": {
+          "shared-dep": "^2.0.0"
+        }
+      },
+      "sha512-efgh5678"
+    ],
+    "shared-dep": [
+      "shared-dep@1.0.0",
+      "https://registry.npmjs.org/shared-dep/-/shared-dep-1.0.0.tgz",
+      {
+        "dependencies": {}
+      },
+      "sha512-ijkl9012"
+    ],
+    "packageB/shared-dep": [
+      "shared-dep@2.0.0",
+      "https://registry.npmjs.org/shared-dep/-/shared-dep-2.0.0.tgz",
+      {
+        "dependencies": {}
+      },
+      "sha512-mnop3456"
+    ],
+    "dev-package": [
+      "dev-package@1.0.0",
+      "https://registry.npmjs.org/dev-package/-/dev-package-1.0.0.tgz",
+      {
+        "dependencies": {
+          "shared-dep": "^1.0.0"
+        }
+      },
+      "sha512-qrst7890"
+    ],
+    "dev-package/shared-dep": [
+      "shared-dep@1.0.0",
+      "https://registry.npmjs.org/shared-dep/-/shared-dep-1.0.0.tgz",
+      {
+        "dependencies": {}
+      },
+      "sha512-ijkl9012"
+    ]
+  }
+}

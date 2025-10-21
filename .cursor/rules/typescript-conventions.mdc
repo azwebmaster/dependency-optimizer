@@ -1,0 +1,46 @@
+---
+globs: *.ts,*.tsx
+description: TypeScript coding conventions and patterns
+---
+
+# TypeScript Conventions
+
+## Import/Export Patterns
+
+- **Always use `.js` extensions** in import statements (required for ESM with NodeNext)
+- **Use named exports** for classes and functions
+- **Use type-only imports** when importing only types: `import type { ... }`
+- **Group imports**: external packages first, then internal modules
+
+```typescript
+import * as fs from 'fs';
+import * as path from 'path';
+import createDebug from 'debug';
+import type { LockFileData } from './lockFileParser.js';
+```
+
+## Interface and Type Definitions
+
+- **Export interfaces** that are part of the public API
+- **Use descriptive names** for interfaces (e.g., `DependencyInfo`, `LockFileData`)
+- **Group related properties** logically in interfaces
+- **Use optional properties** with `?` when appropriate
+
+## Class Patterns
+
+- **Use private fields** with `private` keyword for internal state
+- **Initialize properties** in constructor or as class fields
+- **Use debug logging** with `createDebug` for debugging information
+- **Follow single responsibility** principle - one class per major functionality
+
+## Error Handling
+
+- **Use try-catch blocks** for file operations and JSON parsing
+- **Provide meaningful error messages** with context
+- **Use debug logging** for error details: `debug('Error message: %O', error)`
+
+## File Organization
+
+- **One main class per file** with matching filename
+- **Export types and interfaces** from the same file as their implementation
+- **Use index.ts files** for clean re-exports in folders

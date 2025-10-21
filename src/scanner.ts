@@ -1,14 +1,14 @@
 import depcheck from 'depcheck';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { globby } from 'globby';
 import type {
   ScanOptions,
   ScanResult,
   UnusedDependency,
-  PackageJson,
-  WorkspaceConfig
+  PackageJson
 } from './types.js';
+import { DependencyMerger } from './utils/dependencyMerger.js';
+import { WorkspaceDetector } from './utils/workspaceDetector.js';
 import vitest from './special/vitest.js';
 import createDebug from 'debug';
 
@@ -20,112 +20,19 @@ export class DependencyScanner {
   async scan(projectPath: string = process.cwd()): Promise<ScanResult[]> {
     debug('Starting scan at path: %s', projectPath);
     debug('Scan options: %O', this.options);
-    const results: ScanResult[] = [];
-
-    if (this.options.recursive) {
-      debug('Recursive scan enabled');
-      const workspaces = await this.findWorkspaces(projectPath);
-      debug('Found %d workspaces', workspaces.length);
-
-      for (const workspace of workspaces) {
-        debug('Checking workspace: %s', workspace);
-        if (this.options.workspace && !workspace.includes(this.options.workspace)) {
-          debug('Skipping workspace %s (filter: %s)', workspace, this.options.workspace);
-          continue;
-        }
-        
-        const result = await this.scanSinglePackage(workspace);
-        results.push(result);
-      }
-    } else {
-      debug('Single package scan');
-      const result = await this.scanSinglePackage(projectPath);
-      results.push(result);
-    }
-
-    debug('Scan complete, returning %d results', results.length);
-    return results;
+    
+    // Detect workspace and merge dependencies if needed
+    const workspaceInfo = await WorkspaceDetector.detectWorkspace(projectPath);
+    debug('Workspace info: %O', workspaceInfo);
+    
+    const result = await this.scanSinglePackage(projectPath, workspaceInfo);
+    
+    debug('Scan complete, returning 1 result');
+    return [result];
   }
 
-  private async findWorkspaces(projectPath: string): Promise<string[]> {
-    debug('Finding workspaces in: %s', projectPath);
-    const workspaces: string[] = [projectPath]; // Always include root
-    
-    try {
-      const packageJsonPath = path.join(projectPath, 'package.json');
-      const packageContent = await fs.readFile(packageJsonPath, 'utf-8');
-      const packageJson: PackageJson = JSON.parse(packageContent);
-      
-      // Handle npm/yarn workspaces
-      let workspacePatterns: string[] = [];
-      if (packageJson.workspaces) {
-        debug('Found workspace configuration in package.json');
-        if (Array.isArray(packageJson.workspaces)) {
-          workspacePatterns = packageJson.workspaces;
-        } else if (packageJson.workspaces.packages) {
-          workspacePatterns = packageJson.workspaces.packages;
-        }
-      }
-      
-      // Find workspace packages
-      debug('Workspace patterns: %O', workspacePatterns);
-      for (const pattern of workspacePatterns) {
-        const workspacePaths = await globby(pattern, {
-          cwd: projectPath,
-          onlyDirectories: true,
-          absolute: true
-        });
-        
-        for (const workspacePath of workspacePaths) {
-          const hasPackageJson = await this.fileExists(path.join(workspacePath, 'package.json'));
-          if (hasPackageJson) {
-            debug('Found workspace package at: %s', workspacePath);
-            workspaces.push(workspacePath);
-          }
-        }
-      }
-      
-      // Check for Lerna configuration
-      const lernaPath = path.join(projectPath, 'lerna.json');
-      if (await this.fileExists(lernaPath)) {
-        debug('Found Lerna configuration');
-        try {
-          const lernaContent = await fs.readFile(lernaPath, 'utf-8');
-          const lernaConfig = JSON.parse(lernaContent);
-          
-          if (lernaConfig.packages) {
-            for (const pattern of lernaConfig.packages) {
-              const workspacePaths = await globby(pattern, {
-                cwd: projectPath,
-                onlyDirectories: true,
-                absolute: true
-              });
-              
-              for (const workspacePath of workspacePaths) {
-                const hasPackageJson = await this.fileExists(path.join(workspacePath, 'package.json'));
-                if (hasPackageJson && !workspaces.includes(workspacePath)) {
-                  debug('Found Lerna package at: %s', workspacePath);
-                  workspaces.push(workspacePath);
-                }
-              }
-            }
-          }
-        } catch (error) {
-          // Ignore lerna.json parsing errors
-          debug('Failed to parse lerna.json: %O', error);
-        }
-      }
-      
-    } catch (error) {
-      // If we can't read package.json, just scan the root
-      debug('Failed to read package.json: %O', error);
-    }
-    
-    debug('Total workspaces found: %d', workspaces.length);
-    return workspaces;
-  }
 
-  private async scanSinglePackage(packagePath: string): Promise<ScanResult> {
+  private async scanSinglePackage(packagePath: string, workspaceInfo: any): Promise<ScanResult> {
     debug('Scanning single package at: %s', packagePath);
     const result: ScanResult = {
       packagePath,
@@ -136,13 +43,25 @@ export class DependencyScanner {
     try {
       // Read package.json to get package name
       const packageJsonPath = path.join(packagePath, 'package.json');
+      let packageJson: PackageJson;
       if (await this.fileExists(packageJsonPath)) {
         debug('Reading package.json from: %s', packageJsonPath);
         const packageContent = await fs.readFile(packageJsonPath, 'utf-8');
-        const packageJson: PackageJson = JSON.parse(packageContent);
+        packageJson = JSON.parse(packageContent);
         result.packageName = packageJson.name;
       } else {
         throw new Error(`No package.json found in ${packagePath}`);
+      }
+
+      // If this is a workspace member, merge dependencies from root
+      let effectivePackageJson = packageJson;
+      if (workspaceInfo.isWorkspaceMember) {
+        debug('Merging dependencies from workspace root');
+        const mergedInfo = await DependencyMerger.mergeDependenciesWithWorkspaceRoot(packagePath, workspaceInfo);
+        effectivePackageJson = mergedInfo.mergedDeps;
+        debug('Merged dependencies: %d total deps, %d dev deps', 
+              Object.keys(effectivePackageJson.dependencies || {}).length,
+              Object.keys(effectivePackageJson.devDependencies || {}).length);
       }
 
       // Configure depcheck options with auto-detected specials
@@ -151,6 +70,9 @@ export class DependencyScanner {
 
       if (this.options.verbose) {
         console.log(`🔍 Scanning ${packagePath}`);
+        if (workspaceInfo.isWorkspaceMember) {
+          console.log(`   Workspace member (root: ${workspaceInfo.rootPath})`);
+        }
         console.log(`   Using specials: ${depcheckOptions.specials?.map((s: any) => s.name || 'custom').join(', ') || 'none'}`);
       }
 

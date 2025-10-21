@@ -1,0 +1,43 @@
+{
+  "lockfileVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "circular-deps-project",
+      "dependencies": {
+        "package-a": "^1.0.0"
+      }
+    }
+  },
+  "packages": {
+    "package-a": [
+      "package-a@1.0.0",
+      "https://registry.npmjs.org/package-a/-/package-a-1.0.0.tgz",
+      {
+        "dependencies": {
+          "package-b": "^1.0.0"
+        }
+      },
+      "sha512-abcd1234"
+    ],
+    "package-b": [
+      "package-b@1.0.0",
+      "https://registry.npmjs.org/package-b/-/package-b-1.0.0.tgz",
+      {
+        "dependencies": {
+          "package-c": "^1.0.0"
+        }
+      },
+      "sha512-efgh5678"
+    ],
+    "package-c": [
+      "package-c@1.0.0",
+      "https://registry.npmjs.org/package-c/-/package-c-1.0.0.tgz",
+      {
+        "dependencies": {
+          "package-a": "^1.0.0"
+        }
+      },
+      "sha512-ijkl9012"
+    ]
+  }
+}

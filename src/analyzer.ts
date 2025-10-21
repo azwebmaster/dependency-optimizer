@@ -1,6 +1,8 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { AnalyzeOptions, AnalyzeResult, PackageAnalysis } from './types.js';
+import { WorkspaceDetector } from './utils/workspaceDetector.js';
+import { DependencyMerger } from './utils/dependencyMerger.js';
 import createDebug from 'debug';
 
 const debug = createDebug('depoptimize:analyzer');
@@ -10,32 +12,57 @@ export class NodeModulesAnalyzer {
 
   async analyze(projectPath: string = process.cwd()): Promise<AnalyzeResult> {
     debug('Starting analysis for project: %s', projectPath);
-    const nodeModulesPath = path.join(projectPath, 'node_modules');
+    
+    // Detect workspace and get effective node_modules paths
+    const workspaceInfo = await WorkspaceDetector.detectWorkspace(projectPath);
+    const nodeModulesPaths = DependencyMerger.getEffectiveNodeModulesPaths(projectPath, workspaceInfo);
+    
     const sizeThreshold = (this.options.sizeThreshold || 10) * 1024 * 1024; // Convert MB to bytes
     const depthThreshold = this.options.depthThreshold || 5;
     debug('Configuration - sizeThreshold: %d bytes, depthThreshold: %d', sizeThreshold, depthThreshold);
+    debug('Node modules paths: %O', nodeModulesPaths);
 
     const result: AnalyzeResult = {
       totalPackages: 0,
       totalSize: 0,
       largePackages: [],
       deepPackages: [],
-      nodeModulesPath
+      nodeModulesPath: nodeModulesPaths[0] || path.join(projectPath, 'node_modules')
     };
 
     try {
-      // Check if node_modules exists
-      const nodeModulesExists = await this.directoryExists(nodeModulesPath);
+      // Check if any node_modules exists
+      let nodeModulesExists = false;
+      for (const nodeModulesPath of nodeModulesPaths) {
+        if (await this.directoryExists(nodeModulesPath)) {
+          nodeModulesExists = true;
+          debug('Found node_modules at: %s', nodeModulesPath);
+          break;
+        }
+      }
+      
       if (!nodeModulesExists) {
-        debug('node_modules not found at: %s', nodeModulesPath);
+        debug('No node_modules found in any of the paths: %O', nodeModulesPaths);
         return result;
       }
-      debug('Found node_modules at: %s', nodeModulesPath);
 
-      // Get all packages in node_modules
-      const packages = await this.getAllPackages(nodeModulesPath);
+      // Get all packages from all node_modules paths
+      const allPackages = new Map<string, any>();
+      for (const nodeModulesPath of nodeModulesPaths) {
+        if (await this.directoryExists(nodeModulesPath)) {
+          const packages = await this.getAllPackages(nodeModulesPath);
+          for (const pkg of packages) {
+            // Use package name as key to avoid duplicates
+            if (!allPackages.has(pkg.name)) {
+              allPackages.set(pkg.name, pkg);
+            }
+          }
+        }
+      }
+      
+      const packages = Array.from(allPackages.values());
       result.totalPackages = packages.length;
-      debug('Found %d packages in node_modules', packages.length);
+      debug('Found %d unique packages across all node_modules paths', packages.length);
 
       // Analyze each package
       for (const pkg of packages) {
@@ -124,8 +151,8 @@ export class NodeModulesAnalyzer {
 
                   const packageName = `${entry.name}/${scopedEntry.name}`;
 
-                  // Verify it's a valid package
-                  if (await this.isValidPackage(scopedPath)) {
+                  // Verify it's a valid package and check if it should be included
+                  if (await this.isValidPackage(scopedPath) && await this.shouldIncludePackage(scopedPath, packageName)) {
                     debug('Found scoped package: %s', packageName);
                     packages.push({ name: packageName, path: scopedPath });
                   }
@@ -137,7 +164,7 @@ export class NodeModulesAnalyzer {
             }
           } else {
             // Regular packages
-            if (await this.isValidPackage(entryPath)) {
+            if (await this.isValidPackage(entryPath) && await this.shouldIncludePackage(entryPath, entry.name)) {
               debug('Found package: %s', entry.name);
               packages.push({ name: entry.name, path: entryPath });
             }
@@ -161,6 +188,62 @@ export class NodeModulesAnalyzer {
     } catch {
       return false;
     }
+  }
+
+  private async shouldIncludePackage(packagePath: string, packageName: string): Promise<boolean> {
+    // If includeDevDependencies is true (default), include all packages
+    if (this.options.includeDevDependencies !== false) {
+      return true;
+    }
+
+    // Always use the project root package.json for dependency checks
+    const projectRoot = this.options.projectPath || process.cwd();
+    const packageJsonPath = path.join(projectRoot, 'package.json');
+    let packageJson: any = null;
+    try {
+      const content = await fs.readFile(packageJsonPath, 'utf-8');
+      packageJson = JSON.parse(content);
+    } catch (error) {
+      debug('Could not read root package.json for dev dependency check: %O', error);
+      return true;
+    }
+
+    // Normalize package name for scoped packages
+    let depName = packageName;
+    if (depName.startsWith('@')) {
+      depName = depName.replace(/^(@[^/]+\/[^/]+).*/, '$1');
+    }
+
+    // Check if package is listed as a devDependency
+    const isDevDependency = packageJson.devDependencies && packageJson.devDependencies[depName];
+    if (isDevDependency) {
+      debug('Excluding dev dependency: %s', depName);
+      return false;
+    }
+
+    // Check if package is only reachable through dev dependencies using lock file
+    try {
+      const { LockFileParser } = await import('./lockFileParser.js');
+      const parser = new LockFileParser();
+      const lockData = await parser.parseLockFile(projectRoot);
+      
+      debug('Lock file data for %s: %O', depName, lockData ? 'parsed successfully' : 'failed to parse');
+      
+      if (lockData) {
+        const isOnlyDevDependency = await this.isOnlyDevDependencyFromLockFile(depName, packageJson, lockData);
+        debug('isOnlyDevDependency result for %s: %s', depName, isOnlyDevDependency);
+        if (isOnlyDevDependency) {
+          debug('Excluding dev-only transitive dependency: %s', depName);
+          return false;
+        }
+      }
+    } catch (error) {
+      debug('Could not check dev dependency status for %s: %O', depName, error);
+      // If we can't check, fall back to the original behavior
+    }
+
+    debug('Including production dependency: %s', depName);
+    return true;
   }
 
   private async analyzePackage(packagePath: string, packageName: string): Promise<PackageAnalysis> {
@@ -321,6 +404,112 @@ export class NodeModulesAnalyzer {
     } catch {
       return false;
     }
+  }
+
+  private async isOnlyDevDependencyFromLockFile(packageName: string, packageJson: any, lockData: any): Promise<boolean> {
+    // Get all dev dependencies from package.json
+    const devDependencies = packageJson.devDependencies || {};
+    const productionDependencies = packageJson.dependencies || {};
+    
+    debug('Checking dev dependency status for %s', packageName);
+    debug('Dev dependencies: %O', Object.keys(devDependencies));
+    debug('Production dependencies: %O', Object.keys(productionDependencies));
+    
+    // Check if the package is directly listed as a dev dependency
+    if (devDependencies[packageName]) {
+      debug('Package %s is directly listed as dev dependency', packageName);
+      return true;
+    }
+    
+    // Check if the package is directly listed as a production dependency
+    if (productionDependencies[packageName]) {
+      debug('Package %s is directly listed as production dependency', packageName);
+      return false;
+    }
+    
+    // For transitive dependencies, check if they're only reachable through dev dependencies
+    // We'll traverse the dependency tree from the lock file to find all paths to this package
+    const devPaths = this.findAllPathsToPackage(packageName, Object.keys(devDependencies), lockData);
+    const prodPaths = this.findAllPathsToPackage(packageName, Object.keys(productionDependencies), lockData);
+    
+    debug('Found %d dev paths and %d production paths to %s', devPaths.length, prodPaths.length, packageName);
+    if (devPaths.length > 0) {
+      debug('Dev paths to %s: %O', packageName, devPaths);
+    }
+    if (prodPaths.length > 0) {
+      debug('Production paths to %s: %O', packageName, prodPaths);
+    }
+    
+    // If there are dev paths but no production paths, it's dev-only
+    const isDevOnly = devPaths.length > 0 && prodPaths.length === 0;
+    debug('Package %s is dev-only: %s', packageName, isDevOnly);
+    return isDevOnly;
+  }
+  
+  private findAllPathsToPackage(targetPackage: string, rootPackages: string[], lockData: any): string[][] {
+    const paths: string[][] = [];
+    
+    for (const rootPackage of rootPackages) {
+      const packagePaths = this.findPathsFromPackage(targetPackage, rootPackage, lockData, []);
+      paths.push(...packagePaths);
+    }
+    
+    return paths;
+  }
+  
+  private findPathsFromPackage(targetPackage: string, currentPackage: string, lockData: any, visited: string[]): string[][] {
+    // Prevent infinite recursion
+    if (visited.includes(currentPackage)) {
+      return [];
+    }
+    
+    const newVisited = [...visited, currentPackage];
+    const paths: string[][] = [];
+    
+    debug('Finding paths from %s to %s (visited: %O)', currentPackage, targetPackage, visited);
+    
+    // Check if current package is the target
+    if (currentPackage === targetPackage) {
+      debug('Found target package %s at path: %O', targetPackage, newVisited);
+      return [newVisited];
+    }
+    
+    // Get dependencies of current package from lock file
+    // The lockData structure depends on the lock file type
+    let packageData: any = null;
+    
+    if (lockData.packages) {
+      // Original Bun lock file structure: packages[packageName] = [version, url, {dependencies}, hash]
+      const packageEntry = lockData.packages[currentPackage];
+      if (packageEntry && Array.isArray(packageEntry) && packageEntry.length >= 3) {
+        packageData = packageEntry[2];
+        debug('Found package data for %s in lockData.packages: %O', currentPackage, packageData);
+      } else {
+        debug('No package data found for %s in lockData.packages', currentPackage);
+      }
+    } else if (lockData.dependencies) {
+      // Converted LockFileData structure: dependencies[packageName] = {dependencies: {...}}
+      packageData = lockData.dependencies[currentPackage];
+      debug('Found package data for %s in lockData.dependencies: %O', currentPackage, packageData);
+    }
+    
+    if (!packageData || !packageData.dependencies) {
+      debug('No dependencies found for %s', currentPackage);
+      return [];
+    }
+    
+    debug('Dependencies of %s: %O', currentPackage, Object.keys(packageData.dependencies));
+    
+    // Check each dependency
+    for (const [depName] of Object.entries(packageData.dependencies)) {
+      const depPaths = this.findPathsFromPackage(targetPackage, depName, lockData, newVisited);
+      if (depPaths.length > 0) {
+        debug('Found %d paths from %s to %s via %s', depPaths.length, currentPackage, targetPackage, depName);
+      }
+      paths.push(...depPaths);
+    }
+    
+    return paths;
   }
 
   formatSize(bytes: number): string {

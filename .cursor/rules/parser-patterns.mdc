@@ -1,0 +1,69 @@
+---
+globs: src/parsers/**/*.ts
+description: Lock file parser implementation patterns
+---
+
+# Lock File Parser Patterns
+
+## Parser Structure
+
+Each lock file parser should follow this consistent structure:
+
+### 1. Core Interfaces
+```typescript
+export interface [PackageType]PackageInfo {
+  name: string;
+  version: string;
+  // ... package-specific fields
+}
+
+export interface [PackageType]LockData {
+  type: '[package-type]';
+  packages: Record<string, [PackageType]PackageInfo>;
+  // ... lock-specific fields
+}
+```
+
+### 2. Parser Class
+```typescript
+export class [PackageType]LockParser {
+  private lockData: [PackageType]LockData | null = null;
+  
+  async parseAndNormalize(lockPath: string): Promise<[PackageType]LockData> {
+    // Parse and normalize lock file data
+  }
+  
+  buildDependencyTree(): DependencyTree {
+    // Build dependency tree from parsed data
+  }
+}
+```
+
+## Common Patterns
+
+### File Reading
+- **Check file existence** before reading: `fs.existsSync(lockPath)`
+- **Handle different formats** (JSON, YAML) appropriately
+- **Use try-catch** for parsing errors with meaningful messages
+
+### Data Normalization
+- **Convert to consistent format** regardless of lock file version
+- **Extract package names and versions** consistently
+- **Handle scoped packages** properly (e.g., `@types/node`)
+
+### Dependency Tree Building
+- **Create root node** with consistent structure
+- **Use Map for allNodes** to group by package name
+- **Handle circular dependencies** to prevent infinite loops
+- **Calculate depth** for tree traversal
+
+### Error Handling
+- **Validate lock file format** before processing
+- **Provide specific error messages** for different failure modes
+- **Use debug logging** for troubleshooting
+
+## Integration with Main Parser
+
+- **Return compatible data structures** that work with `LockFileParser`
+- **Handle type conversion** to `DependencyInfo` format
+- **Support all required methods** for dependency analysis

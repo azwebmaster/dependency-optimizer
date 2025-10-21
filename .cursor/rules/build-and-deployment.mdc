@@ -1,0 +1,64 @@
+---
+description: Build, testing, and deployment guidelines
+---
+
+# Build and Deployment
+
+## Development Workflow
+
+### Package Manager
+- **Use Bun** as specified in [package.json](mdc:package.json) (`"packageManager": "bun@1.2.19"`)
+- **Install dependencies**: `bun install`
+- **Run scripts**: `bun run <script>`
+
+### Build Process
+- **TypeScript compilation**: `npm run build` (uses `bun tsc`)
+- **Output directory**: `dist/` with source maps and declarations
+- **Module format**: ESM with NodeNext resolution
+
+### Testing
+- **Run tests**: `npm test` (uses Vitest)
+- **Watch mode**: `npm run test:watch`
+- **Coverage**: `npm run test:coverage`
+- **UI mode**: `npm run test:ui`
+
+## Code Quality
+
+### TypeScript Configuration
+- **Strict mode enabled** in [tsconfig.json](mdc:tsconfig.json)
+- **ES2022 target** with NodeNext modules
+- **Source maps and declarations** generated
+- **Consistent casing** enforced
+
+### Import Requirements
+- **Always use `.js` extensions** in imports (required for ESM)
+- **Use type-only imports** for type definitions
+- **Follow NodeNext module resolution** patterns
+
+## Release Process
+
+### Versioning
+- **Use Changesets** for version management
+- **Create changeset**: `npm run changeset`
+- **Version packages**: `npm run version`
+- **Publish**: `npm run release`
+
+### Package Configuration
+- **ESM module** (`"type": "module"`)
+- **Main entry**: `dist/index.js`
+- **Types**: `dist/index.d.ts`
+- **CLI binary**: `dist/cli.js`
+- **Files included**: Only `dist/` directory
+
+## Common Issues
+
+### Build Errors
+- **Missing `.js` extensions** in imports
+- **Type compatibility** between parser interfaces
+- **Duplicate exports** in index files
+- **Missing dependencies** in package.json
+
+### Test Issues
+- **Import path problems** with test utilities
+- **File extension mismatches** in test imports
+- **Missing test fixtures** or corrupted test files

@@ -1,0 +1,43 @@
+---
+alwaysApply: true
+description: Project structure and architecture guidelines
+---
+
+# Dependency Optimizer Project Structure
+
+This is a TypeScript Node.js project for analyzing and optimizing package dependencies.
+
+## Core Architecture
+
+- **Main entry point**: [src/index.ts](mdc:src/index.ts) - exports all public APIs and convenience functions
+- **CLI interface**: [src/cli.ts](mdc:src/cli.ts) - command-line interface using Commander.js
+- **Configuration**: [package.json](mdc:package.json) - ESM module with Bun as package manager
+- **TypeScript config**: [tsconfig.json](mdc:tsconfig.json) - NodeNext module resolution with strict settings
+
+## Parser Architecture
+
+Lock file parsers are organized in [src/parsers/](mdc:src/parsers/) with one folder per lock file type:
+- `bun/` - Bun lock file parser
+- `npm/` - npm package-lock.json parser  
+- `pnpm/` - pnpm-lock.yaml parser
+- `yarn/` - yarn.lock parser
+
+Each parser folder contains:
+- `index.ts` - exports for the parser
+- `*LockParser.ts` - main parser implementation
+- `*LockParser.test.ts` - unit tests (optional)
+
+## Key Components
+
+- **LockFileParser**: [src/lockFileParser.ts](mdc:src/lockFileParser.ts) - unified interface for all lock file types
+- **DependencyTreeBuilder**: [src/dependencyTreeBuilder.ts](mdc:src/dependencyTreeBuilder.ts) - builds dependency trees from lock data
+- **DuplicateDetector**: [src/duplicateDetector.ts](mdc:src/duplicateDetector.ts) - finds duplicate dependencies
+- **Scanner**: [src/scanner.ts](mdc:src/scanner.ts) - scans for unused dependencies
+- **Analyzer**: [src/analyzer.ts](mdc:src/analyzer.ts) - analyzes node_modules structure
+
+## Testing
+
+- Tests use Vitest framework
+- Test files follow `*.test.ts` naming convention
+- Test utilities in [test/testUtils.ts](mdc:test/testUtils.ts)
+- Test fixtures in [test/fixtures/](mdc:test/fixtures/)

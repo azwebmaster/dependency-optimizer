@@ -1,0 +1,25 @@
+---
+description: Quick reference for common testing and development tasks
+alwaysApply: true
+---
+
+# Quick Reference
+
+## Common Commands
+- **Build**: `npm run build`
+- **Test**: `npm test`
+- **Test watch**: `npm run test:watch`
+- **Test coverage**: `npm run test:coverage`
+
+## Key Files
+- **Main entry**: [src/index.ts](mdc:src/index.ts)
+- **CLI**: [src/cli.ts](mdc:src/cli.ts)
+- **Parsers**: [src/parsers/](mdc:src/parsers/)
+- **Tests**: `*.test.ts` files
+- **Config**: [package.json](mdc:package.json), [tsconfig.json](mdc:tsconfig.json)
+
+## Important Notes
+- **Always use `.js` extensions** in imports (ESM requirement)
+- **Use Bun** as package manager
+- **Follow parser patterns** in [src/parsers/](mdc:src/parsers/)
+- **Test files** should be simple and focused

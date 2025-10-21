@@ -1,0 +1,22 @@
+{
+  "lockfileVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "invalid-test-project",
+      "dependencies": {
+        "package-with-invalid-format": "^1.0.0"
+      }
+    }
+  },
+  "packages": {
+    "package-with-invalid-format": [
+      "incomplete-array"
+    ],
+    "package-with-bad-name": [
+      "invalid-name-format",
+      "https://registry.npmjs.org/package/-/package-1.0.0.tgz",
+      {},
+      "sha512-abcd1234"
+    ]
+  }
+}
