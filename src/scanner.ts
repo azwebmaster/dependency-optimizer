@@ -25,22 +25,6 @@ export class DependencyScanner {
     const workspaceInfo = await WorkspaceDetector.detectWorkspace(projectPath);
     debug('Workspace info: %O', workspaceInfo);
     
-    // If recursive is enabled and this is a workspace, scan all workspace members
-    if (this.options.recursive && workspaceInfo.workspaceType && workspaceInfo.memberPackages.length > 1) {
-      debug('Recursive scan enabled, scanning %d workspace members', workspaceInfo.memberPackages.length);
-      const results: ScanResult[] = [];
-      
-      for (const memberPath of workspaceInfo.memberPackages) {
-        debug('Scanning workspace member: %s', memberPath);
-        const memberWorkspaceInfo = await WorkspaceDetector.detectWorkspace(memberPath);
-        const result = await this.scanSinglePackage(memberPath, memberWorkspaceInfo);
-        results.push(result);
-      }
-      
-      debug('Scan complete, returning %d results', results.length);
-      return results;
-    }
-    
     const result = await this.scanSinglePackage(projectPath, workspaceInfo);
     
     debug('Scan complete, returning 1 result');

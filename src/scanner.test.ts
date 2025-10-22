@@ -133,15 +133,14 @@ describe('DependencyScanner', () => {
       'console.log("Package A");'
     );
 
-    const scanner = new DependencyScanner({ recursive: true });
+    const scanner = new DependencyScanner();
     const results = await scanner.scan(tempDir);
 
-    expect(results.length).toBeGreaterThanOrEqual(2); // Root + package-a
+    // Should only scan the root package now (no recursive scanning)
+    expect(results.length).toBe(1);
     
-    const packageAResult = results.find(r => r.packageName === 'package-a');
-    expect(packageAResult).toBeDefined();
-    expect(packageAResult?.unusedDependencies).toEqual([
-      { name: 'unused-in-a', type: 'dependencies' }
-    ]);
+    const rootResult = results[0];
+    expect(rootResult.packageName).toBe('monorepo');
+    expect(rootResult.unusedDependencies).toEqual([]);
   });
 });
