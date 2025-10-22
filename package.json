@@ -1,6 +1,6 @@
 {
   "name": "@azwebmaster/dependency-optimizer",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "description": "Scan for unused dependencies and node_modules waste",
   "publishConfig": {
     "registry": "https://registry.npmjs.org"
@@ -75,7 +75,9 @@
   "homepage": "https://github.com/azwebmaster/dependency-optimizer#readme",
   "depoptimizer": {
     "devcheck": {
-      "exclude": ["depcheck"]
+      "exclude": [
+        "depcheck"
+      ]
     }
   }
 }
