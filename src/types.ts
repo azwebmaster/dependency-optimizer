@@ -7,6 +7,8 @@ export interface ScanOptions {
   includeDevDependencies?: boolean;
   /** Specific package name to scan (optional) */
   packageName?: string;
+  /** Enable recursive scanning of workspace members */
+  recursive?: boolean;
 }
 
 export interface AnalyzeOptions {
